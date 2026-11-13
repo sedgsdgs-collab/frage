@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Eine Frage an dich</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,800&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3b1d3a;
+    --ink-soft: #6e4a6b;
+    --accent: #ff2e63;
+    --accent-dark: #e0245a;
+    --card: #fff7f9;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: "Inter", system-ui, sans-serif;
+    color: var(--ink);
+    overflow: hidden;
+    /* statischer Verlauf – keine Animation, keine Filter */
+    background: linear-gradient(135deg, #ffb3b8 0%, #fcd5cb 45%, #c3b1e1 100%) fixed;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+
+  .card {
+    width: min(520px, 100%);
+    padding: clamp(32px, 7vw, 52px) clamp(20px, 5vw, 44px);
+    text-align: center;
+    background: var(--card);
+    border-radius: 28px;
+    border: 1px solid #fff;
+    box-shadow: 0 12px 32px rgba(80, 20, 70, 0.18);
+  }
+
+  .badge {
+    display: inline-block;
+    font: 600 13px/1 "Inter", system-ui, sans-serif;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: #ffe3ea;
+    padding: 8px 14px;
+    border-radius: 999px;
+  }
+
+  h1 {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 800;
+    font-size: clamp(30px, 7.5vw, 44px);
+    line-height: 1.12;
+    margin: 20px 0 12px;
+    letter-spacing: -0.01em;
+  }
+  p.sub {
+    margin: 0 0 34px;
+    color: var(--ink-soft);
+    font-size: clamp(15px, 3.8vw, 17px);
+  }
+
+  .buttons {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    align-items: center;
+    min-height: 60px;
+    flex-wrap: wrap;
+  }
+  button {
+    font: 600 18px/1 "Inter", system-ui, sans-serif;
+    border: 0;
+    border-radius: 999px;
+    padding: 16px 40px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #yes {
+    color: #fff;
+    background: var(--accent);
+    box-shadow: 0 6px 14px rgba(255, 46, 99, 0.35);
+  }
+  #yes:hover { background: var(--accent-dark); }
+  #no {
+    color: var(--ink);
+    background: #fff;
+    border: 2px solid #f1d4de;
+  }
+  /* fliegt frei über die Seite – hängt direkt am body */
+  #no.flying { position: fixed; z-index: 50; margin: 0; }
+
+  .success { display: none; }
+  .card.done .question { display: none; }
+  .card.done .success { display: block; }
+  .big { font-size: clamp(56px, 14vw, 76px); line-height: 1; }
+
+  .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 40; }
+</style>
+</head>
+<body>
+  <canvas class="confetti" id="confetti"></canvas>
+
+  <main class="card" id="card">
+    <section class="question">
+      <span class="badge">Eine Frage</span>
+      <h1>Willst du mit mir ausgehen?</h1>
+      <p class="sub">Denk gut nach … es gibt nur eine richtige Antwort.</p>
+      <div class="buttons">
+        <button id="yes" type="button">Ja</button>
+        <button id="no" type="button" tabindex="-1">Nein</button>
+      </div>
+    </section>
+
+    <section class="success">
+      <div class="big">🎉</div>
+      <h1>Juhuu! Ich wusste es!</h1>
+      <p class="sub">Ich freu mich riesig auf dich.</p>
+    </section>
+  </main>
+
+<script>
+(() => {
+  const no = document.getElementById('no');
+  const yes = document.getElementById('yes');
+  const card = document.getElementById('card');
+  const PAD = 16;
+
+  const texts = ['Nein', 'Sicher? 🥺', 'Wirklich?', 'Nö nö nö', 'Zu langsam 😜', 'Versuch’s nochmal', 'Keine Chance!', 'Fang mich doch 🏃', 'Bitte nicht 😢', 'Klick lieber Ja!'];
+  let dodges = 0;
+  let px = -9999, py = -9999;
+  let busy = false;
+
+  function clamp(v, min, max) { return Math.max(min, Math.min(v, max)); }
+
+  function dodge() {
+    if (busy) return;
+    busy = true;
+    requestAnimationFrame(() => { busy = false; });
+
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+
+    if (!no.classList.contains('flying')) {
+      const r0 = no.getBoundingClientRect();
+      // Platzhalter, damit "Ja" nicht verrutscht
+      const ph = document.createElement('span');
+      ph.style.cssText = `display:inline-block;width:${r0.width}px;height:${r0.height}px`;
+      no.parentNode.insertBefore(ph, no);
+      document.body.appendChild(no);   // direkt an body hängen -> Koordinaten = Bildschirm
+      no.classList.add('flying');
+    }
+
+    // neuen Text zuerst setzen, damit die Größe stimmt
+    dodges++;
+    no.textContent = texts[dodges % texts.length];
+    const w = no.offsetWidth, h = no.offsetHeight;
+    const old = no.getBoundingClientRect();
+    const ya = yes.getBoundingClientRect();
+    const maxX = Math.max(PAD, vw - w - PAD);
+    const maxY = Math.max(PAD, vh - h - PAD);
+
+    let best = null, bestScore = -1;
+    for (let i = 0; i < 40; i++) {
+      const x = PAD + Math.random() * (maxX - PAD);
+      const y = PAD + Math.random() * (maxY - PAD);
+      const hitsYes = x < ya.right + 12 && x + w > ya.left - 12 && y < ya.bottom + 12 && y + h > ya.top - 12;
+      if (hitsYes) continue;
+      const dPointer = Math.hypot(x + w / 2 - px, y + h / 2 - py);
+      const dOld = Math.hypot(x - old.left, y - old.top);
+      const score = Math.min(dPointer, dOld * 1.5);
+      if (score > bestScore) { bestScore = score; best = [x, y]; }
+      if (dPointer > 200 && dOld > 140) break;
+    }
+    if (!best) best = [PAD, PAD];
+
+    no.style.left = clamp(best[0], PAD, maxX) + 'px';
+    no.style.top = clamp(best[1], PAD, maxY) + 'px';
+
+    yes.style.transform = `scale(${Math.min(1 + dodges * 0.06, 1.6)})`;
+  }
+
+  // PC: Maus in der Nähe -> ausweichen
+  document.addEventListener('mousemove', (e) => {
+    px = e.clientX; py = e.clientY;
+    const r = no.getBoundingClientRect();
+    const dx = Math.max(r.left - px, 0, px - r.right);
+    const dy = Math.max(r.top - py, 0, py - r.bottom);
+    if (dx * dx + dy * dy < 1600) dodge();
+  }, { passive: true });
+
+  no.addEventListener('mouseenter', (e) => { px = e.clientX; py = e.clientY; dodge(); });
+
+  // Handy: Berührung -> weg, Klick verhindern
+  no.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const t = e.touches[0];
+    if (t) { px = t.clientX; py = t.clientY; }
+    dodge();
+  }, { passive: false });
+
+  no.addEventListener('mousedown', (e) => { e.preventDefault(); dodge(); });
+  no.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); dodge(); });
+  no.addEventListener('focus', () => { no.blur(); dodge(); });
+
+  // Bei Größenänderung im sichtbaren Bereich halten
+  window.addEventListener('resize', () => {
+    if (!no.classList.contains('flying')) return;
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    no.style.left = clamp(no.offsetLeft, PAD, Math.max(PAD, vw - no.offsetWidth - PAD)) + 'px';
+    no.style.top = clamp(no.offsetTop, PAD, Math.max(PAD, vh - no.offsetHeight - PAD)) + 'px';
+  });
+
+  yes.addEventListener('click', () => {
+    card.classList.add('done');
+    no.style.display = 'none';
+    confetti();
+  });
+
+  // leichtes Konfetti: wenige Teilchen, kurze Dauer, keine Retina-Skalierung
+  function confetti() {
+    const c = document.getElementById('confetti');
+    const ctx = c.getContext('2d');
+    const W = c.width = innerWidth, H = c.height = innerHeight;
+    const colors = ['#ff2e63', '#ffb3b8', '#ffd166', '#a18cd1', '#7bdcb5'];
+    const parts = Array.from({ length: 80 }, () => ({
+      x: W / 2, y: H / 2,
+      vx: (Math.random() - 0.5) * 14, vy: Math.random() * -14 - 4,
+      s: 6 + Math.random() * 6,
+      col: colors[(Math.random() * colors.length) | 0]
+    }));
+    let frame = 0;
+    (function tick() {
+      ctx.clearRect(0, 0, W, H);
+      for (const p of parts) {
+        p.vy += 0.4; p.x += p.vx; p.y += p.vy;
+        ctx.fillStyle = p.col;
+        ctx.fillRect(p.x, p.y, p.s, p.s * 0.6);
+      }
+      if (++frame < 150) requestAnimationFrame(tick);
+      else ctx.clearRect(0, 0, W, H);
+    })();
+  }
+})();
+</script>
+</body>
+</html>
